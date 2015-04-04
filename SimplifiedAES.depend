@@ -1,0 +1,7 @@
+# depslib dependency file v1.0
+1427562285 source:f:\work\git\simplifiedaes\main.c
+	<stdio.h>
+	<stdlib.h>
+
+1427562231 source:f:\work\git\simplifiedaes\simplifiedaes.c
+
