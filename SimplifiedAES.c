@@ -34,7 +34,7 @@ uint8_t INVERSE_MIXCOLUMN_MATRIX[] =
 
 uint8_t RC[] = {0x80, 0x30};
 
-uint8_t MUTI_TABLE[16][16] =
+uint8_t MULTIPLY_TABLE[16][16] =
 {
     {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
     {0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF},
@@ -130,9 +130,9 @@ void KeyExpand(Key k, ExpandedKey ek)
     }
 }
 
-uint8_t Mutiply(uint8_t a, uint8_t b)
+uint8_t Multiply(uint8_t a, uint8_t b)
 {
-    return MUTI_TABLE[a][b];
+    return MULTIPLY_TABLE[a][b];
 }
 
 void MixColumn(ByteState bs, const uint8_t* matrix)
@@ -142,10 +142,10 @@ void MixColumn(ByteState bs, const uint8_t* matrix)
     uint32_t* p1;
     uint32_t* p2;
 
-    tmp[0] = Mutiply(bs[0], matrix[0]) ^ Mutiply(bs[2], matrix[1]);
-    tmp[1] = Mutiply(bs[1], matrix[0]) ^ Mutiply(bs[3], matrix[1]);
-    tmp[2] = Mutiply(bs[0], matrix[2]) ^ Mutiply(bs[2], matrix[3]);
-    tmp[3] = Mutiply(bs[1], matrix[2]) ^ Mutiply(bs[3], matrix[3]);
+    tmp[0] = Multiply(bs[0], matrix[0]) ^ Multiply(bs[2], matrix[1]);
+    tmp[1] = Multiply(bs[1], matrix[0]) ^ Multiply(bs[3], matrix[1]);
+    tmp[2] = Multiply(bs[0], matrix[2]) ^ Multiply(bs[2], matrix[3]);
+    tmp[3] = Multiply(bs[1], matrix[2]) ^ Multiply(bs[3], matrix[3]);
 
     p1 = (uint32_t*)tmp;
     p2 = (uint32_t*)bs;
