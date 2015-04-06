@@ -15,6 +15,13 @@ extern uint8_t MIXCOLUMN_MATRIX[];
 extern uint8_t INVERSE_MIXCOLUMN_MATRIX[];
 extern uint8_t RC[];
 
-void ShiftRow(ByteState);
+extern void ShiftRow(ByteState);
+extern void AddRoundKey(ByteState, Key);
+extern void KeyExpand(Key, ExpandedKey);
+extern void MixColumn(ByteState, const uint8_t*);
+
+extern void Encrypt(void*, Key);
+extern void Decrypt(void*, Key);
+
 
 #endif // _SIMPLIFIEDAES_H_

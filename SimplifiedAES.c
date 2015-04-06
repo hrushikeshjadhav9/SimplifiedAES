@@ -1,9 +1,9 @@
-#include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "SimplifiedAES.h"
 
-
+/* S-Box */
 uint8_t S_BOX[] =
 {
     0x9, 0x4, 0xA, 0xB,
@@ -12,6 +12,7 @@ uint8_t S_BOX[] =
     0xC, 0xE, 0xF, 0x7
 };
 
+/* Inverse S-Box */
 uint8_t INVERSE_S_BOX[] =
 {
     0xA, 0x5, 0x9, 0xB,
@@ -32,6 +33,7 @@ uint8_t INVERSE_MIXCOLUMN_MATRIX[] =
     2, 9
 };
 
+/* Round Constants used in key expansion algorithm */
 uint8_t RC[] = {0x80, 0x30};
 
 uint8_t MULTIPLY_TABLE[16][16] =
@@ -61,6 +63,9 @@ void ShiftRow(ByteState bs)
     bs[1] ^= bs[3];
 }
 
+/*
+ * NibbleSub: Apply a nibble substitute use given matrix
+ */
 void NibbleSub(ByteState bs, const uint8_t* matrix)
 {
     int i;
@@ -71,6 +76,9 @@ void NibbleSub(ByteState bs, const uint8_t* matrix)
     }
 }
 
+/*
+ * StateExpand: Expand a 2x2 nibble matrix(2byte) to 2x2 byte matrix(4byte)
+ */
 void StateExpand(State s, ByteState bs)
 {
     int i;
@@ -82,6 +90,9 @@ void StateExpand(State s, ByteState bs)
     }
 }
 
+/*
+ * StateExpand: Pack a 2x2 byte matrix(4byte) to 2x2 nibble matrix(2byte)
+ */
 void StatePack(ByteState bs, State s)
 {
     int i;
@@ -92,6 +103,9 @@ void StatePack(ByteState bs, State s)
     }
 }
 
+/*
+ * AddRoundKey: Apply a matrix addition(XOR) to State with k
+ */
 void AddRoundKey(ByteState bs, Key k)
 {
     ByteState ek;
@@ -105,23 +119,23 @@ void AddRoundKey(ByteState bs, Key k)
     *p1 ^= *p2;
 }
 
+/* g: Function used in KeyExpand() */
 uint8_t g(uint8_t w)
 {
-    uint8_t ret;
-    static uint8_t round =0;
+    static uint8_t round = 0;
 
-    ret = S_BOX[w >> 4] | S_BOX[w & 0xF] << 4;
-    ret ^= RC[round++];
-
-    return ret;
+    // RCon ^ NibbleSub(NibbleRot(w)) == RCon ^ NibbleRot(NibbleSub(w))
+    return (S_BOX[w >> 4] | S_BOX[w & 0xF] << 4) ^ RC[round++ % 2];
 }
 
+/*
+ * KeyExpand: Expand a 2bytes key to 6byte for encryption/decryption
+ */
 void KeyExpand(Key k, ExpandedKey ek)
 {
     int i;
 
-    ek[0][0] = k[0];
-    ek[0][1] = k[1];
+    memcpy(ek[0], k, 2);
 
     for (i = 1; i < 3; i++)
     {
@@ -137,60 +151,84 @@ uint8_t Multiply(uint8_t a, uint8_t b)
 
 void MixColumn(ByteState bs, const uint8_t* matrix)
 {
-    int i, j;
     ByteState tmp;
-    uint32_t* p1;
-    uint32_t* p2;
 
     tmp[0] = Multiply(bs[0], matrix[0]) ^ Multiply(bs[2], matrix[1]);
     tmp[1] = Multiply(bs[1], matrix[0]) ^ Multiply(bs[3], matrix[1]);
     tmp[2] = Multiply(bs[0], matrix[2]) ^ Multiply(bs[2], matrix[3]);
     tmp[3] = Multiply(bs[1], matrix[2]) ^ Multiply(bs[3], matrix[3]);
 
-    p1 = (uint32_t*)tmp;
-    p2 = (uint32_t*)bs;
-    *p2 = *p1;
+    memcpy(bs, tmp, 4);
 }
 
-// Testing
-int main(int argc, char* argv[])
+/*
+ * S-AES (Simplified AES) encryption algorithm
+ *
+ * Route: Ak0 -> NS -> SR -> MC -> Ak1 -> NS -> SR -> Ak2
+ *
+ * NOTE: NibbleSub uses S_BOX
+ *       MixColumn uses MIXCOLUMN_MATRIX
+ */
+void Encrypt(void* data, Key k)
 {
-    State s = {0xCB, 0x6D};
+    State s;
     ByteState bs;
-    Key k = {1, 2};
     ExpandedKey ek;
     int i;
 
-    printf("State: %04X\n", *(uint16_t*)s);
+    memcpy(s, data, 2);
 
     StateExpand(s, bs);
-    printf("ByteState: %08X\n", *(uint32_t*)bs);
-
-    MixColumn(bs, MIXCOLUMN_MATRIX);
-    printf("MixColumn: %08X\n", *(uint32_t*)bs);
-
-    NibbleSub(bs, S_BOX);
-    printf("NibbleSub: %08X\n", *(uint32_t*)bs);
-
-    NibbleSub(bs, INVERSE_S_BOX);
-    printf("NibbleSub: %08X\n", *(uint32_t*)bs);
-
-    ShiftRow(bs);
-    printf("ShiftRow: %08X\n", *(uint32_t*)bs);
-
-    ShiftRow(bs);
-    printf("ShiftRow: %08X\n", *(uint32_t*)bs);
-
     KeyExpand(k, ek);
-    for (i = 0; i < 3; i++)
-    {
-        printf("Key[%d]: %04X\n", i, *(uint16_t*)ek[i]);
-    }
 
-    AddRoundKey(bs, ek[0]);
-    printf("AddRoundKey: %08X\n", *(uint32_t*)bs);
+    for (i = 0; i < 2; i++)
+    {
+        AddRoundKey(bs, ek[i]);
+        NibbleSub(bs, S_BOX);
+        ShiftRow(bs);
+        if (i == 0)
+        {
+            MixColumn(bs, MIXCOLUMN_MATRIX);
+        }
+    }
+    AddRoundKey(bs, ek[2]);
 
     StatePack(bs, s);
-    printf("StatePack: %04X\n", *(uint16_t*)s);
+    memcpy(data, s, 2);
 }
 
+/*
+ * S-AES (Simplified AES) decryption algorithm
+ *
+ * Route: Ak0 <- NS <- SR <- MC <- Ak1 <- NS <- SR <- Ak2
+ *
+ * NOTE: NibbleSub uses INVERSE_S_BOX
+ *       MixColumn uses INVERSE_MIXCOLUMN_MATRIX
+ */
+void Decrypt(void* data, Key k)
+{
+    State s;
+    ByteState bs;
+    ExpandedKey ek;
+    int i;
+
+    memcpy(s, data, 2);
+
+    StateExpand(s, bs);
+    KeyExpand(k, ek);
+
+    for (i = 2; i > 0; i--)
+    {
+        AddRoundKey(bs, ek[i]);
+        if (i == 1)
+        {
+            MixColumn(bs, INVERSE_MIXCOLUMN_MATRIX);
+        }
+        ShiftRow(bs);
+        NibbleSub(bs, INVERSE_S_BOX);
+    }
+    AddRoundKey(bs, ek[0]);
+
+    StatePack(bs, s);
+    memcpy(data, s, 2);
+}
