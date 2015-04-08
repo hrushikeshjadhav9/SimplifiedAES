@@ -1,15 +1,18 @@
 # depslib dependency file v1.0
-1428321040 source:f:\work\git\simplifiedaes\main.c
+1428517522 source:f:\work\git\simplifiedaes\main.c
 	<stdio.h>
+	<stdlib.h>
 	<string.h>
+	<unistd.h>
 	<time.h>
 	"SimplifiedAES.h"
 
-1428321160 source:f:\work\git\simplifiedaes\simplifiedaes.c
+1428516993 source:f:\work\git\simplifiedaes\simplifiedaes.c
+	<stdlib.h>
 	<stdint.h>
 	<string.h>
 	"SimplifiedAES.h"
 
-1428320471 f:\work\git\simplifiedaes\simplifiedaes.h
+1428514440 f:\work\git\simplifiedaes\simplifiedaes.h
 	<stdint.h>
 

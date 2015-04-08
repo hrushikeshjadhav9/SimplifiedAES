@@ -1,33 +1,24 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <time.h>
 
 #include "SimplifiedAES.h"
 
 
-
-int main(int argc, char* argv[])
-{
-    testing();
-}
-
-// Testing
-void testing()
+void MixColumn_testing()
 {
     State s;
     ByteState bs;
-    Key k;
-    ExpandedKey ek;
-    unsigned int i;
-    uint16_t _k;
-    uint16_t data;
-    int err;
-    int st, et;
 
-    // MixColumn test
+    unsigned int i;
+    int err;
+
+    err = 0;
+
     for (i = 0; i <= 0xFFFF; i++)
     {
-        err = 0;
         memcpy(s, &i, 2);
         StateExpand(s, bs);
         MixColumn(bs, MIXCOLUMN_MATRIX);
@@ -44,11 +35,22 @@ void testing()
     {
         printf("[Module testing] MixColumn() passed\n");
     }
+}
 
-    // AddRoundKey test
+void AddRoundKey_testing()
+{
+    State s;
+    ByteState bs;
+    Key k;
+
+    unsigned int i;
+    uint16_t _k;
+    int err;
+
+    err = 0;
+
     for (i = 0; i <= 0xFFFF; i++)
     {
-        err = 0;
         memcpy(s, &i, 2);
         StateExpand(s, bs);
         srand(time(NULL));
@@ -69,11 +71,20 @@ void testing()
     {
         printf("[Module testing] AddRoundKey() passed\n");
     }
+}
 
-    // NibbleSub test
+void NibbleSub_testing()
+{
+    State s;
+    ByteState bs;
+
+    unsigned int i;
+    int err;
+
+    err = 0;
+
     for (i = 0; i <= 0xFFFF; i++)
     {
-        err = 0;
         memcpy(s, &i, 2);
         StateExpand(s, bs);
 
@@ -91,11 +102,20 @@ void testing()
     {
         printf("[Module testing] NibbleSub() passed\n");
     }
+}
 
-    // ShiftRow test
+void ShiftRow_testing()
+{
+    State s;
+    ByteState bs;
+
+    unsigned int i;
+    int err;
+
+    err = 0;
+
     for (i = 0; i <= 0xFFFF; i++)
     {
-        err = 0;
         memcpy(s, &i, 2);
         StateExpand(s, bs);
 
@@ -113,32 +133,89 @@ void testing()
     {
         printf("[Module testing] ShiftRow() passed\n");
     }
+}
 
-    // Encryption and Decryption test
+void Intergration_testing()
+{
+    Key k;
+
+    unsigned int i;
+    uint16_t _k;
+    uint8_t* buffer1;
+    uint8_t* buffer2;
+    int err;
+
+    err = 0;
+
     for (i = 0; i <= 0xFFFF; i++)
     {
-        err = 0;
-        data = i;
         _k = rand();
+
+        // Key
         memcpy(k, &_k, 2);
 
-//        printf("Data: %04X\t", data);
-        Encrypt(&data, k);
-//        printf("Encrypted: %04X\t", data);
-        Decrypt(&data, k);
-//        printf("Decrypted: %04X\t", data);
-        if (data != i)
+        // Load data
+        buffer1 = (uint8_t*)malloc(2);
+        memcpy(buffer1, &i, 2);
+
+        // Encryption
+        buffer2 = SAES_Encrypt(buffer1, 2, k);
+        free(buffer1);
+
+
+        // Decryption
+        buffer1 = SAES_Decrypt(buffer2, 4, k);
+
+        if (*(uint16_t*)buffer1 != i)
         {
             printf("%04X Not match\n", i);
         }
-//        else
-//        {
-//            printf("Passed\n");
-//        }
     }
 
     if (!err)
     {
         printf("[Integration testing] passed\n");
     }
+}
+
+void self_testing()
+{
+    MixColumn_testing();
+    AddRoundKey_testing();
+    NibbleSub_testing();
+    ShiftRow_testing();
+
+    Intergration_testing();
+}
+
+int main(int argc, char* argv[])
+{
+    self_testing();
+
+    Key k;
+    char input[256];
+    char charkey[4];
+    uint8_t* buffer1;
+    uint8_t* buffer2;
+    int decypted_l;
+    int encypted_l;
+
+    printf("Enter a key (2 characters): ");
+    scanf("%s", charkey);
+
+    memcpy(k, charkey, 2);
+    printf("Some text:\n");
+    gets(input);
+    gets(input);
+
+    decypted_l = strlen(input) + 1;
+    encypted_l = decypted_l + 2 - decypted_l % 2;
+    printf("Input length: %d\nEncrypted length: %d\n", decypted_l, encypted_l);
+    buffer1 = SAES_Encrypt(input, encypted_l, k);
+    printf("Encrypted data:\n%s\n", buffer1);
+
+    buffer2 = SAES_Decrypt(buffer1, encypted_l + 2, k);
+    printf("Decrypted data:\n%s\n", buffer2);
+
+    return 0;
 }

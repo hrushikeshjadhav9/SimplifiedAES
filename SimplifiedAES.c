@@ -1,10 +1,12 @@
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "SimplifiedAES.h"
 
+
 /* S-Box */
-uint8_t S_BOX[] =
+const uint8_t S_BOX[] =
 {
     0x9, 0x4, 0xA, 0xB,
     0xD, 0x1, 0x8, 0x5,
@@ -13,7 +15,7 @@ uint8_t S_BOX[] =
 };
 
 /* Inverse S-Box */
-uint8_t INVERSE_S_BOX[] =
+const uint8_t INVERSE_S_BOX[] =
 {
     0xA, 0x5, 0x9, 0xB,
     0x1, 0x7, 0x8, 0xF,
@@ -21,22 +23,22 @@ uint8_t INVERSE_S_BOX[] =
     0xC, 0x4, 0xD, 0xE
 };
 
-uint8_t MIXCOLUMN_MATRIX[] =
+const uint8_t MIXCOLUMN_MATRIX[] =
 {
     1, 4,
     4, 1
 };
 
-uint8_t INVERSE_MIXCOLUMN_MATRIX[] =
+const uint8_t INVERSE_MIXCOLUMN_MATRIX[] =
 {
     9, 2,
     2, 9
 };
 
 /* Round Constants used in key expansion algorithm */
-uint8_t RC[] = {0x80, 0x30};
+const uint8_t RC[] = {0x80, 0x30};
 
-uint8_t MULTIPLY_TABLE[16][16] =
+const uint8_t MULTIPLY_TABLE[16][16] =
 {
     {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
     {0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xE, 0xF},
@@ -56,6 +58,9 @@ uint8_t MULTIPLY_TABLE[16][16] =
     {0x0, 0xF, 0xD, 0x2, 0x9, 0x6, 0x4, 0xB, 0x1, 0xE, 0xC, 0x3, 0x8, 0x7, 0x5, 0xA}
 };
 
+/*
+ * ShiftRow: Swap ByteState[1] and ByteState[3]
+ */
 void ShiftRow(ByteState bs)
 {
     bs[1] ^= bs[3];
@@ -77,7 +82,7 @@ void NibbleSub(ByteState bs, const uint8_t* matrix)
 }
 
 /*
- * StateExpand: Expand a 2x2 nibble matrix(2byte) to 2x2 byte matrix(4byte)
+ * StateExpand: Expand a 2x2 nibble matrix (2byte) to 2x2 byte matrix (4byte)
  */
 void StateExpand(State s, ByteState bs)
 {
@@ -91,7 +96,7 @@ void StateExpand(State s, ByteState bs)
 }
 
 /*
- * StateExpand: Pack a 2x2 byte matrix(4byte) to 2x2 nibble matrix(2byte)
+ * StateExpand: Pack a 2x2 byte matrix (4byte) to 2x2 nibble matrix (2byte)
  */
 void StatePack(ByteState bs, State s)
 {
@@ -168,33 +173,68 @@ void MixColumn(ByteState bs, const uint8_t* matrix)
  *
  * NOTE: NibbleSub uses S_BOX
  *       MixColumn uses MIXCOLUMN_MATRIX
+ *       Input data will be padded to (floor(length / 2) + 1) * 2 bytes
+ *       Output data length equal to Input with padding
  */
-void Encrypt(void* data, Key k)
+void* SAES_Encrypt(void* data, size_t length, Key k)
 {
     State s;
     ByteState bs;
     ExpandedKey ek;
+
+    size_t memsize;
+    uint8_t* head;
+    uint8_t* curs;
+    uint8_t* tail;
     int i;
+    int padding;
 
-    memcpy(s, data, 2);
+    padding = 2 - length % 2;
 
-    StateExpand(s, bs);
+    // Data length must be mod 2
+    memsize = length + padding;
+
+    head = (uint8_t*)malloc(memsize);
+    curs = head;
+    tail = head + memsize;
+
+    // Copy original data
+    memcpy(curs, data, length);
+
+    // Padding
+    memset(head + length, padding, padding);
+
     KeyExpand(k, ek);
 
-    for (i = 0; i < 2; i++)
+    while (curs != tail)
     {
-        AddRoundKey(bs, ek[i]);
-        NibbleSub(bs, S_BOX);
-        ShiftRow(bs);
-        if (i == 0)
-        {
-            MixColumn(bs, MIXCOLUMN_MATRIX);
-        }
-    }
-    AddRoundKey(bs, ek[2]);
+        // Load 2 bytes into state
+        memcpy(s, curs, 2);
 
-    StatePack(bs, s);
-    memcpy(data, s, 2);
+        StateExpand(s, bs);
+
+        for (i = 0; i < 2; i++)
+        {
+            AddRoundKey(bs, ek[i]);
+            NibbleSub(bs, S_BOX);
+            ShiftRow(bs);
+            if (i == 0)
+            {
+                MixColumn(bs, MIXCOLUMN_MATRIX);
+            }
+        }
+        AddRoundKey(bs, ek[2]);
+
+        StatePack(bs, s);
+
+        // Replace original data
+        memcpy(curs, s, 2);
+
+        // Next block
+        curs += 2;
+    }
+
+    return head;
 }
 
 /*
@@ -204,31 +244,66 @@ void Encrypt(void* data, Key k)
  *
  * NOTE: NibbleSub uses INVERSE_S_BOX
  *       MixColumn uses INVERSE_MIXCOLUMN_MATRIX
+ *       Padding in Output data will be automatically truncated,
+ *       so Output data length equal to Input data length
  */
-void Decrypt(void* data, Key k)
+void* SAES_Decrypt(void* data, size_t length, Key k)
 {
     State s;
     ByteState bs;
     ExpandedKey ek;
+
+    uint8_t* head;
+    uint8_t* curs;
+    uint8_t* tail;
     int i;
+    int padding;
 
-    memcpy(s, data, 2);
+    head = (uint8_t*)malloc(length);
+    curs = head;
+    tail = head + length;
 
-    StateExpand(s, bs);
+    // Copy original data
+    memcpy(head, data, length);
+
     KeyExpand(k, ek);
 
-    for (i = 2; i > 0; i--)
+    while (curs != tail)
     {
-        AddRoundKey(bs, ek[i]);
-        if (i == 1)
-        {
-            MixColumn(bs, INVERSE_MIXCOLUMN_MATRIX);
-        }
-        ShiftRow(bs);
-        NibbleSub(bs, INVERSE_S_BOX);
-    }
-    AddRoundKey(bs, ek[0]);
+        // Load 2 bytes into state
+        memcpy(s, curs, 2);
 
-    StatePack(bs, s);
-    memcpy(data, s, 2);
+        StateExpand(s, bs);
+        KeyExpand(k, ek);
+
+        for (i = 2; i > 0; i--)
+        {
+            AddRoundKey(bs, ek[i]);
+            if (i == 1)
+            {
+                MixColumn(bs, INVERSE_MIXCOLUMN_MATRIX);
+            }
+            ShiftRow(bs);
+            NibbleSub(bs, INVERSE_S_BOX);
+        }
+        AddRoundKey(bs, ek[0]);
+
+        StatePack(bs, s);
+
+        // Replace original data
+        memcpy(curs, s, 2);
+
+        // Next block
+        curs += 2;
+    }
+
+    // Get padding length from last data block
+    padding = head[length - 1];
+
+    // Truncate padding
+    realloc(head, length - padding);
+
+    return head;
 }
+
+
