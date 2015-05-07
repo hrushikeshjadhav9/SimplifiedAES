@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include "SimplifiedAES.h"
@@ -176,7 +178,7 @@ void MixColumn(ByteState bs, const uint8_t* matrix)
  *       Input data will be padded to (floor(length / 2) + 1) * 2 bytes
  *       Output data length equal to Input with padding
  */
-void* SAES_Encrypt(void* data, size_t length, Key k)
+void* SAES_Encrypt(void* data, size_t length, Key k, size_t* out_length)
 {
     State s;
     ByteState bs;
@@ -234,6 +236,9 @@ void* SAES_Encrypt(void* data, size_t length, Key k)
         curs += 2;
     }
 
+    // Length of return block
+    *out_length = memsize;
+
     return head;
 }
 
@@ -247,7 +252,7 @@ void* SAES_Encrypt(void* data, size_t length, Key k)
  *       Padding in Output data will be automatically truncated,
  *       so Output data length equal to Input data length
  */
-void* SAES_Decrypt(void* data, size_t length, Key k)
+void* SAES_Decrypt(void* data, size_t length, Key k, size_t* out_length)
 {
     State s;
     ByteState bs;
@@ -303,7 +308,102 @@ void* SAES_Decrypt(void* data, size_t length, Key k)
     // Truncate padding
     realloc(head, length - padding);
 
+    // Length of return block
+    *out_length = length - padding;
+
     return head;
 }
 
+bool FileEncrypt(char* in_file_name, char* out_file_name, Key k)
+{
+    FILE* in_fp;
+    FILE* out_fp;
 
+    uint8_t* in_buff;
+    uint8_t* out_buff;
+    size_t length;
+    size_t out_length;
+
+    in_fp = fopen(in_file_name, "rb");
+    out_fp = fopen(out_file_name, "wb");
+
+    if (!in_fp || !out_fp)
+    {
+        return false;
+    }
+
+    fseek(in_fp, 0, SEEK_END);
+    length = ftell(in_fp);
+    in_buff = (uint8_t*)malloc(length);
+    rewind(in_fp);
+    fread(in_buff, length, 1, in_fp);
+
+    out_buff = (uint8_t*)SAES_Encrypt(in_buff, length, k, &out_length);
+    fwrite(out_buff, out_length, 1, out_fp);
+
+    return true;
+}
+
+bool FileDecrypt(char* in_file_name, char* out_file_name, Key k)
+{
+    FILE* in_fp;
+    FILE* out_fp;
+
+    uint8_t* in_buff;
+    uint8_t* out_buff;
+    size_t length;
+    size_t out_length;
+
+    in_fp = fopen(in_file_name, "rb");
+    out_fp = fopen(out_file_name, "wb");
+
+    if (!in_fp || !out_fp)
+    {
+        return false;
+    }
+
+    fseek(in_fp, 0, SEEK_END);
+    length = ftell(in_fp);
+    in_buff = (uint8_t*)malloc(length);
+    rewind(in_fp);
+    fread(in_buff, length, 1, in_fp);
+
+    out_buff = (uint8_t*)SAES_Decrypt(in_buff, length, k, &out_length);
+    fwrite(out_buff, out_length, 1, out_fp);
+
+    return true;
+}
+
+void ShowHelp()
+{
+    fprintf(stderr, "\
+Usage: SimplifiedAES [-d|-e] -i <input> -o <output> -k <Key>\n\
+       SimplifiedAES -t\n\
+\n\
+Options:\n\
+\n\
+  -d    Decrypt mode\n\
+  -e    Encrypt mode\n\
+  -i    Input file name\n\
+  -o    Output file name\n\
+  -k    Encrypt/decrypt key (2 characters)\n\
+  -t    Self testing\n");
+}
+
+void GetKey(Key* k)
+{
+    char charkey1[16];
+    char charkey2[16];
+    printf("Enter your key(2 characters): ");
+    scanf("%s", charkey1);
+    printf("Confirm your key(2 characters): ");
+    scanf("%s", charkey2);
+
+    if (strcmp(charkey1, charkey2))
+    {
+        printf("Key not match!\n");
+        exit(2);
+    }
+
+    memcpy(k, charkey1, 2);
+}

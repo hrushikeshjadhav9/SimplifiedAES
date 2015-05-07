@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifndef _SIMPLIFIEDAES_H_
 #define _SIMPLIFIEDAES_H_
@@ -23,8 +24,14 @@ extern void StateExpand(State, ByteState);
 extern void StatePack(ByteState, State);
 extern void NibbleSub(ByteState, const uint8_t*);
 
-extern void* SAES_Encrypt(void*, size_t, Key);
-extern void* SAES_Decrypt(void*, size_t, Key);
+extern void* SAES_Encrypt(void*, size_t, Key, size_t*);
+extern void* SAES_Decrypt(void*, size_t, Key, size_t*);
+
+extern bool FileEncrypt(char*, char*, Key);
+extern bool FileDecrypt(char*, char*, Key);
+
+extern void ShowHelp();
+extern void GetKey(Key*);
 
 
 #endif // _SIMPLIFIEDAES_H_
