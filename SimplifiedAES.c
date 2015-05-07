@@ -394,15 +394,15 @@ void GetKey(Key* k)
 {
     char charkey1[16];
     char charkey2[16];
-    printf("Enter your key(2 characters): ");
+    printf("Enter your key (2 characters): ");
     scanf("%s", charkey1);
-    printf("Confirm your key(2 characters): ");
+    printf("Confirm your key (2 characters): ");
     scanf("%s", charkey2);
 
     if (strcmp(charkey1, charkey2))
     {
         printf("Key not match!\n");
-        exit(2);
+        exit(EXIT_FAILURE);
     }
 
     memcpy(k, charkey1, 2);

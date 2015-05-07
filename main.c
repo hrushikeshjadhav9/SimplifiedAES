@@ -7,7 +7,7 @@
 
 int main(int argc, char* argv[])
 {
-    char opt;
+    int opt;
     char* optstring = "dek:i:o:t";
     bool (*action)(char*, char*, Key);
 
@@ -47,13 +47,12 @@ int main(int argc, char* argv[])
             break;
         case 't':
             self_testing();
-            exit(0);
+            exit(EXIT_SUCCESS);
         default:
             ShowHelp();
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
-
 
     if (in_file_is_set && out_file_is_set && method_is_set)
     {
@@ -71,3 +70,4 @@ int main(int argc, char* argv[])
 
     return 0;
 }
+
