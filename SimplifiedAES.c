@@ -386,7 +386,7 @@ Options:\n\
   -e    Encrypt mode\n\
   -i    Input file name\n\
   -o    Output file name\n\
-  -k    Encrypt/decrypt key (2 characters)\n\
+  -k    Encrypt/decrypt key using PRNG\n\
   -t    Self testing\n");
 }
 
@@ -406,4 +406,24 @@ void GetKey(Key* k)
     }
 
     memcpy(k, charkey1, 2);
+}
+
+// 16 bit LFSR PRNG
+uint16_t RandGenerator(uint16_t seed)
+{
+    uint16_t rnd;
+    uint16_t state;
+    int i;
+
+    rnd = 0;
+    state = seed;
+
+    for (i = 0; i < 16; i++)
+    {
+        rnd <<= 1;
+        rnd ^= state >> 7 & 1;
+        state = (state << 1) ^ (state >> 14 & 1) ^ (state >> 13 & 1) ^ (state >> 11 & 1) ^ (state & 1);
+    }
+
+    return rnd;
 }

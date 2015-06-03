@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "SimplifiedAES.h"
 
 int main(int argc, char* argv[])
 {
     int opt;
-    char* optstring = "dek:i:o:t";
+    char* optstring = "deki:o:t";
     bool (*action)(char*, char*, Key);
 
     char* in_file_name;
@@ -42,7 +43,6 @@ int main(int argc, char* argv[])
             out_file_is_set = true;
             break;
         case 'k':
-            memcpy(k, optarg, 2);
             key_is_set = true;
             break;
         case 't':
@@ -56,9 +56,46 @@ int main(int argc, char* argv[])
 
     if (in_file_is_set && out_file_is_set && method_is_set)
     {
-        if (!key_is_set)
+        // Use user specified key
+        if (key_is_set)
         {
             GetKey(&k);
+        }
+        // Use random
+        else
+        {
+            uint16_t rnd;
+            FILE* key_file;
+
+            if (action == FileEncrypt)
+            {
+                rnd = RandGenerator(time(NULL) % 0xFF);
+                memcpy(k, &rnd, 2);
+
+                key_file = fopen(".rnd", "wb");
+
+                if (!key_file)
+                {
+                    printf("Key file .rnd could not be opened for write!\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                fwrite(k, 2, 1, key_file);
+            }
+            else
+            {
+                key_file = fopen(".rnd", "rb");
+
+                if (!key_file)
+                {
+                    printf("Key file .rnd not found!\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                fread(k, 2, 1, key_file);
+            }
+
+            fclose(key_file);
         }
 
         action(in_file_name, out_file_name, k);
