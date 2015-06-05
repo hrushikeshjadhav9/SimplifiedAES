@@ -377,7 +377,7 @@ bool FileDecrypt(char* in_file_name, char* out_file_name, Key k)
 void ShowHelp()
 {
     fprintf(stderr, "\
-Usage: SimplifiedAES [-d|-e] -i <input> -o <output> -k <Key>\n\
+Usage: SimplifiedAES [-d|-e] [-k] -i <input> -o <output>\n\
        SimplifiedAES -t\n\
 \n\
 Options:\n\
